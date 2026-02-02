@@ -19,10 +19,19 @@ def extract_next_links(url, resp):
     if resp.status != 200 or not resp.raw_response or not resp.raw_response.content:
         return []
 
+    # check if file size is very large (>2MB); avoid crawling
+    if len(resp.raw_response.content) > 2_000_000:
+        return []
+
     links = set()
     
     try:
         soup = BeautifulSoup(resp.raw_response.content, 'html.parser')
+
+        # check if page has little text; avoid crawling
+        text = soup.get_text(strip=True)
+        if len(text) < 200:
+            return []
         
         for anchor in soup.find_all('a', href=True):
             href = anchor['href']
