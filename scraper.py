@@ -56,6 +56,23 @@ def is_valid(url):
         if not any(netloc_lower.endswith(domain) or netloc_lower == domain[1:] for domain in allowed_domains):
             return False
         
+        ### Check and avoid infinite traps ###
+        # url too long
+        if len(url) > 300:
+            return False
+
+        # check for trap keywords
+        if re.search(r"(calendar|login|signup|reply|share)", url.lower()):
+            return False
+
+        # skip pagination (can change to allow based on reqs)
+        if re.search(r"(page=\d+|p=\d+)", url.lower()):
+            return False
+
+        # check for excessive query params
+        if parsed.query and len(parsed.query) > 100:
+            return False
+
         # disallow any file types other than html
         return not re.match(
             r".*\.(css|js|bmp|gif|jpe?g|ico"
