@@ -1,9 +1,9 @@
 import os
 import shelve
-
+import time
 from threading import Thread, RLock
 from queue import Queue, Empty
-
+from urllib.parse import urlparse
 from utils import get_logger, get_urlhash, normalize
 from scraper import is_valid
 
@@ -12,6 +12,9 @@ class Frontier(object):
         self.logger = get_logger("FRONTIER")
         self.config = config
         self.to_be_downloaded = list()
+        
+        self.domain_last_access = {}
+        self.domain_lock = RLock()
         
         if not os.path.exists(self.config.save_file) and not restart:
             # Save file does not exist, but request to load save.
@@ -70,3 +73,28 @@ class Frontier(object):
 
         self.save[urlhash] = (url, True)
         self.save.sync()
+    
+    def wait_for_politeness(self, url):
+        try:
+            domain = urlparse(url).netloc.lower()
+        except Exception:
+            return
+        
+        with self.domain_lock:
+            if domain in self.domain_last_access:
+                time_since_last = time.time() - self.domain_last_access[domain]
+                
+                if time_since_last < self.config.time_delay:
+                    sleep_time = self.config.time_delay - time_since_last
+                    self.logger.info(
+                        f"Politeness delay: sleeping {sleep_time:.2f}s for {domain}")
+                    time.sleep(sleep_time)
+    
+    def record_domain_access(self, url):
+        try:
+            domain = urlparse(url).netloc.lower()
+        except Exception:
+            return
+        
+        with self.domain_lock:
+            self.domain_last_access[domain] = time.time()
