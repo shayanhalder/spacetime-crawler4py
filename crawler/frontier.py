@@ -13,8 +13,11 @@ class Frontier(object):
         self.config = config
         self.to_be_downloaded = list()
         
+        # Thread-safe structures
         self.domain_last_access = {}
         self.domain_lock = RLock()
+        self.frontier_lock = RLock()  # Lock for frontier operations
+        self.save_lock = RLock()  # Lock for shelve operations
         
         if not os.path.exists(self.config.save_file) and not restart:
             # Save file does not exist, but request to load save.
@@ -51,28 +54,32 @@ class Frontier(object):
             f"total urls discovered.")
 
     def get_tbd_url(self):
-        try:
-            return self.to_be_downloaded.pop()
-        except IndexError:
-            return None
+        with self.frontier_lock:
+            try:
+                return self.to_be_downloaded.pop()
+            except IndexError:
+                return None
 
     def add_url(self, url):
         url = normalize(url)
         urlhash = get_urlhash(url)
-        if urlhash not in self.save:
-            self.save[urlhash] = (url, False)
-            self.save.sync()
-            self.to_be_downloaded.append(url)
+        with self.save_lock:
+            if urlhash not in self.save:
+                self.save[urlhash] = (url, False)
+                self.save.sync()
+                with self.frontier_lock:
+                    self.to_be_downloaded.append(url)
     
     def mark_url_complete(self, url):
         urlhash = get_urlhash(url)
-        if urlhash not in self.save:
-            # This should not happen.
-            self.logger.error(
-                f"Completed url {url}, but have not seen it before.")
+        with self.save_lock:
+            if urlhash not in self.save:
+                # This should not happen.
+                self.logger.error(
+                    f"Completed url {url}, but have not seen it before.")
 
-        self.save[urlhash] = (url, True)
-        self.save.sync()
+            self.save[urlhash] = (url, True)
+            self.save.sync()
     
     def wait_for_politeness(self, url):
         try:
