@@ -6,7 +6,7 @@ def scraper(url, resp):
     links = extract_next_links(url, resp)
     return [link for link in links if is_valid(link)]
 
-def extract_next_links(url, resp):
+def extract_next_links(url, resp, min_text_length=200):
     # Implementation required.
     # url: the URL that was used to get the page
     # resp.url: the actual url of the page
@@ -30,10 +30,11 @@ def extract_next_links(url, resp):
 
         # check if page has little text; avoid crawling
         text = soup.get_text(strip=True)
-        if len(text) < 200:
+        if len(text) < min_text_length:
             return []
         
-        for anchor in soup.find_all('a', href=True):
+        a_tags = soup.find_all('a', href=True)
+        for anchor in a_tags:
             href = anchor['href']
             absolute_url = urljoin(resp.url, href)
             
