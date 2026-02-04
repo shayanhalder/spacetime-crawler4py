@@ -1,7 +1,7 @@
 import os
 import logging
 from hashlib import sha256
-from urllib.parse import urlparse
+from urllib.parse import urlparse, urldefrag
 
 def get_logger(name, filename=None):
     logger = logging.getLogger(name)
@@ -24,12 +24,15 @@ def get_logger(name, filename=None):
 
 def get_urlhash(url):
     parsed = urlparse(url)
-    # everything other than scheme.
+    # everything other than scheme and fragment.
     return sha256(
         f"{parsed.netloc}/{parsed.path}/{parsed.params}/"
-        f"{parsed.query}/{parsed.fragment}".encode("utf-8")).hexdigest()
+        f"{parsed.query}".encode("utf-8")).hexdigest()
 
 def normalize(url):
+    # Remove fragment
+    url = urldefrag(url)[0]
+    # Remove trailing slash
     if url.endswith("/"):
         return url.rstrip("/")
     return url
