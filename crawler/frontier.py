@@ -86,16 +86,18 @@ class Frontier(object):
             domain = urlparse(url).netloc.lower()
         except Exception:
             return
-        
+        sleep_time = 0
         with self.domain_lock:
-            if domain in self.domain_last_access:
-                time_since_last = time.time() - self.domain_last_access[domain]
-                
-                if time_since_last < self.config.time_delay:
-                    sleep_time = self.config.time_delay - time_since_last
-                    self.logger.info(
-                        f"Politeness delay: sleeping {sleep_time:.2f}s for {domain}")
-                    time.sleep(sleep_time)
+            now = time.time()
+            available_at = self.domain_last_access.get(domain, 0)
+
+            if now < available_at:
+                sleep_time = available_at - now
+            self.domain_last_access[domain] = max(now, available_at) + self.config.time_delay    
+      
+        if sleep_time > 0:
+            self.logger.info(f"Politeness delay: sleeping {sleep_time:.2f}s for {domain}")
+            time.sleep(sleep_time)
     
     def record_domain_access(self, url):
         try:

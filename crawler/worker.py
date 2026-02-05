@@ -25,8 +25,7 @@ class Worker(Thread):
 
             self.frontier.wait_for_politeness(tbd_url)
             resp = download(tbd_url, self.config, self.logger)
-            self.frontier.record_domain_access(tbd_url)
-            
+
             self.logger.info(
                 f"Downloaded {tbd_url}, status <{resp.status}>, "
                 f"using cache {self.config.cache_server}.")
