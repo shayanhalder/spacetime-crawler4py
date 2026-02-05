@@ -34,6 +34,7 @@ class Frontier(object):
         if restart:
             for url in self.config.seed_urls:
                 self.add_url(url)
+            self.save['longest_page'] = (None, 0)
         else:
             # Set the frontier state with contents of save file.
             self._parse_save_file()
@@ -70,14 +71,17 @@ class Frontier(object):
                 with self.frontier_lock:
                     self.to_be_downloaded.append(url)
     
-    def mark_url_complete(self, url):
+    def mark_url_complete(self, url, word_count):
         urlhash = get_urlhash(url)
         with self.save_lock:
             if urlhash not in self.save:
                 # This should not happen.
                 self.logger.error(
                     f"Completed url {url}, but have not seen it before.")
-
+            
+            if word_count > self.save['longest_page'][1]:
+                self.save['longest_page'] = (url, word_count)
+                
             self.save[urlhash] = (url, True)
             self.save.sync()
     
