@@ -4,7 +4,7 @@ from bs4 import BeautifulSoup
 
 SEEN_EXACT_HASHES = set()
 SEEN_SIMHASHES = set()
-SIMHASH_DIFF_THRESHOLD = 6
+SIMHASH_DIFF_THRESHOLD = 3
 
 def scraper(url, resp):
     links, words = extract_next_links(url, resp)
