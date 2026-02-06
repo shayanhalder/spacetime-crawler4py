@@ -8,7 +8,7 @@ SIMHASH_DIFF_THRESHOLD = 6
 
 def scraper(url, resp):
     links, words = extract_next_links(url, resp)
-    return [link for link in links if is_valid(link)]
+    return [link for link in links if is_valid(link)], words
 
 def extract_next_links(url, resp, min_text_length=200):
     # Implementation required.
