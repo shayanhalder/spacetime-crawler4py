@@ -36,7 +36,7 @@ class Frontier(object):
             for url in self.config.seed_urls:
                 self.add_url(url)
             self.save['longest_page'] = (None, 0)
-            self.save['subdomain_frequencies'] = defaultdict[str, int](int)
+            self.save['subdomain_frequencies'] = defaultdict(int)
         else:
             # Set the frontier state with contents of save file.
             self._parse_save_file()
@@ -46,15 +46,21 @@ class Frontier(object):
 
     def _parse_save_file(self):
         ''' This function can be overridden for alternate saving techniques. '''
-        total_count = len(self.save)
-        tbd_count = 0
-        for url, completed in self.save.values():
+        with self.save_lock:
+            total_count = len(self.save)
+            save_values = self.save.values()
+
+        urls_to_add = []
+        for url, completed in save_values:
             if not completed and is_valid(url):
-                self.to_be_downloaded.append(url)
-                tbd_count += 1
+                urls_to_add.append(url)
+
         self.logger.info(
-            f"Found {tbd_count} urls to be downloaded from {total_count} "
+            f"Found {len(urls_to_add)} urls to be downloaded from {total_count} "
             f"total urls discovered.")
+        
+        with self.frontier_lock:
+            self.to_be_downloaded.extend(urls_to_add)
 
     def get_tbd_url(self):
         with self.frontier_lock:
@@ -66,12 +72,16 @@ class Frontier(object):
     def add_url(self, url):
         url = normalize(url)
         urlhash = get_urlhash(url)
+        add_to_frontier = False
         with self.save_lock:
             if urlhash not in self.save:
                 self.save[urlhash] = (url, False)
                 self.save.sync()
-                with self.frontier_lock:
-                    self.to_be_downloaded.append(url)
+                add_to_frontier = True
+
+        if add_to_frontier:
+            with self.frontier_lock:
+                self.to_be_downloaded.append(url)
     
     def mark_url_complete(self, url, word_count):
         urlhash = get_urlhash(url)
@@ -80,6 +90,10 @@ class Frontier(object):
                 # This should not happen.
                 self.logger.error(
                     f"Completed url {url}, but have not seen it before.")
+                return
+            
+            if 'longest_page' not in self.save:
+                self.save['longest_page'] = (None, 0)
             
             if word_count > self.save['longest_page'][1]:
                 self.save['longest_page'] = (url, word_count)
@@ -89,9 +103,12 @@ class Frontier(object):
     
     def log_domain_count(self, url):
         domain = urlparse(url).netloc.lower()
-
         with self.save_lock:
-            self.save['subdomain_frequencies'][domain] += 1
+            if 'subdomain_frequencies' not in self.save:
+                self.save['subdomain_frequencies'] = defaultdict(int)
+            freq = self.save.get('subdomain_frequencies', defaultdict(int))
+            freq[domain] = freq.get(domain, 0) + 1
+            self.save['subdomain_frequencies'] = freq
             self.save.sync()
         
     def wait_for_politeness(self, url):
