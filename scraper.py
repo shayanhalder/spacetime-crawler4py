@@ -90,6 +90,18 @@ def is_valid(url):
         if re.search(r"(calendar|login|signup|reply|share)", url.lower()):
             return False
 
+        # check if any query parameter values contain any dates (ex: YYYY-MM-DD, YYYY/MM/DD, YYYYMMDD)
+        if parsed.query:
+            # This matches YYYY-MM-DD, YYYY/MM/DD, YYYY.MM.DD, or just YYYYMMDD
+            date_patterns = [
+                r"\b\d{4}[-/\.]\d{1,2}[-/\.]\d{1,2}\b",   # 2023-05-22, 2023/05/22, 2023.05.22
+                r"\b\d{8}\b"  # 20230522
+            ]
+            query_lower = parsed.query.lower()
+            for pat in date_patterns:
+                if re.search(pat, query_lower):
+                    return False
+
         # skip pagination (can change to allow based on reqs)
         if re.search(r"(page=\d+|p=\d+)", url.lower()):
             return False
