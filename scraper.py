@@ -17,11 +17,11 @@ def extract_next_links(url, resp, min_text_length=200):
     #         resp.raw_response.content: the content of the page!
     
     if resp.status != 200 or not resp.raw_response or not resp.raw_response.content:
-        return [], 0
+        return [], []
 
     # check if file size is very large (>2MB); avoid crawling
     if len(resp.raw_response.content) > 2_000_000:
-        return [], 0
+        return [], []
 
     links = set()
     
@@ -33,10 +33,9 @@ def extract_next_links(url, resp, min_text_length=200):
 
         words = text.split()
         words = [w for w in words if re.search(r'[a-zA-Z]', w)] # only count words with letters
-        word_count = len(words)
 
         if len(text) < min_text_length:
-            return [], word_count
+            return [], words
 
         a_tags = soup.find_all('a', href=True)
         for anchor in a_tags:
@@ -49,12 +48,12 @@ def extract_next_links(url, resp, min_text_length=200):
             if absolute_url:
                 links.add(absolute_url)
         
-        return list(links), word_count
+        return list(links), words
     
     except Exception as e:
         print(f"Error extracting links from {url}: {e}")
         
-    return [], word_count
+    return [], words
 
 def is_valid(url):
     # Decide whether to crawl this url or not. 
