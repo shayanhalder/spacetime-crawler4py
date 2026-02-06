@@ -29,9 +29,10 @@ class Worker(Thread):
             self.logger.info(
                 f"Downloaded {tbd_url}, status <{resp.status}>, "
                 f"using cache {self.config.cache_server}.")
-            scraped_urls, word_count = scraper.scraper(tbd_url, resp)
+            scraped_urls, words = scraper.scraper(tbd_url, resp)
             for scraped_url in scraped_urls:
                 self.frontier.add_url(scraped_url)
-            self.frontier.mark_url_complete(tbd_url, word_count)
+            self.frontier.mark_url_complete(tbd_url, len(words))
             self.frontier.log_domain_count(tbd_url)
+            self.frontier.log_word_frequency(words)
             #time.sleep(self.config.time_delay)
