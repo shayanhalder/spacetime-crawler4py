@@ -16,8 +16,13 @@ def most_common_words(k=50):
         print(f"{k}: {v}  ", end='')
         n += 1
 
-def subdmoains():
+def subdomains():
     print(f"{len(save['subdomain_frequencies'].keys())} subdomains found: ")
     print(save['subdomain_frequencies'])
 
+if __name__ == "__main__":
+    num_unique_pages()
+    longest_page()
+    most_common_words()
+    subdomains()
 
