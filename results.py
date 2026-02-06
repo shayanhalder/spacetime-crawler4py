@@ -8,11 +8,12 @@ def num_unique_pages():
 def longest_page():
     print("Longest page: ", save['longest_page'])
 
-def most_common_words(k=50):
+def most_common_words(limit=50):
     print(f"{k} most common words: ")
     n = 0
-    for k, v in save['word_frequency'].items():
-        if n == k: break
+    word_frequencies = save['word_frequency'].items()
+    for k, v in word_frequencies:
+        if n == limit: break
         print(f"{k}: {v}  ", end='')
         n += 1
 
