@@ -16,6 +16,7 @@ def most_common_words(limit=50):
         if n == limit: break
         print(f"{k}: {v}  ", end='')
         n += 1
+    print()
 
 def subdomains():
     print(f"{len(save['subdomain_frequencies'].keys())} subdomains found: ")
