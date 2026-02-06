@@ -6,6 +6,7 @@ from queue import Queue, Empty
 from urllib.parse import urlparse
 from utils import get_logger, get_urlhash, normalize
 from scraper import is_valid
+from collections import defaultdict
 
 class Frontier(object):
     def __init__(self, config, restart):
@@ -35,6 +36,7 @@ class Frontier(object):
             for url in self.config.seed_urls:
                 self.add_url(url)
             self.save['longest_page'] = (None, 0)
+            self.save['subdomain_frequencies'] = defaultdict[str, int](int)
         else:
             # Set the frontier state with contents of save file.
             self._parse_save_file()
@@ -81,10 +83,17 @@ class Frontier(object):
             
             if word_count > self.save['longest_page'][1]:
                 self.save['longest_page'] = (url, word_count)
-                
+
             self.save[urlhash] = (url, True)
             self.save.sync()
     
+    def log_domain_count(self, url):
+        domain = urlparse(url).netloc.lower()
+
+        with self.save_lock:
+            self.save['subdomain_frequencies'][domain] += 1
+            self.save.sync()
+        
     def wait_for_politeness(self, url):
         try:
             domain = urlparse(url).netloc.lower()
