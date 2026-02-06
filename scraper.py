@@ -2,8 +2,12 @@ import re
 from urllib.parse import urlparse, urljoin
 from bs4 import BeautifulSoup
 
+SEEN_EXACT_HASHES = set()
+SEEN_SIMHASHES = set()
+SIMHASH_DIFF_THRESHOLD = 6
+
 def scraper(url, resp):
-    links = extract_next_links(url, resp)
+    links, words = extract_next_links(url, resp)
     return [link for link in links if is_valid(link)]
 
 def extract_next_links(url, resp, min_text_length=200):
@@ -35,6 +39,13 @@ def extract_next_links(url, resp, min_text_length=200):
         words = [w for w in words if re.search(r'[a-zA-Z]', w)] # only count words with letters
 
         if len(text) < min_text_length:
+            return [], words
+
+        if exact_duplicate(text):
+            return [], words
+
+        document_fingerprint = compute_simhash(words)
+        if near_duplicate(document_fingerprint):
             return [], words
 
         a_tags = soup.find_all('a', href=True)
@@ -101,3 +112,82 @@ def is_valid(url):
     except TypeError:
         print ("TypeError for ", parsed)
         raise
+
+def exact_duplicate(text):
+    # Duplicate detection using normalized text (all lowercase, extra spacing removed).
+    # Uses a checksum-style polynomial rolling hash.
+
+    normalized = re.sub(r"\s+", " ", text.lower()).strip()
+
+    h = 0
+    base = 31
+    mod = 2**64  # limit hash to 64 bits
+
+    for ch in normalized:
+        h = (h * base + ord(ch)) % mod
+
+    if h in SEEN_EXACT_HASHES:
+        return True
+
+    SEEN_EXACT_HASHES.add(h)
+    return False
+
+def hash_word(word):
+    # Generates a deterministic hash value for a word using
+    # a polynomial rolling hash.
+
+    hash_value = 0
+    base = 131
+
+    for character in word:
+        hash_value = hash_value * base + ord(character)
+
+    return hash_value & ((1 << 64) - 1)
+
+def compute_simhash(word_list, fingerprint_size=64):
+    # Computes a SimHash fingerprint for a document
+    # Words are treated as features weighted by frequency
+    feature_weights = {}
+    for word in word_list:
+        feature_weights[word] = feature_weights.get(word, 0) + 1
+    
+    similarity_vector = [0] * fingerprint_size
+
+    for word, weight in feature_weights.items():
+        word_hash = hash_word(word)  # fixed-length hash value for the word
+
+        for bit_position in range(fingerprint_size):
+            bit_mask = 1 << bit_position
+
+            if word_hash & bit_mask:
+                similarity_vector[bit_position] += weight
+            else:
+                similarity_vector[bit_position] -= weight
+
+    fingerprint = 0
+    for bit_position in range(fingerprint_size):
+        if similarity_vector[bit_position] > 0:
+            fingerprint |= (1 << bit_position)
+
+    return fingerprint
+
+def count_bit_differences(hash1, hash2):
+    # Counts how many bit positions differ between two fingerprints.
+    diff = hash1 ^ hash2  # XOR highlights differing bits
+    count = 0
+
+    while diff:
+        count += diff & 1
+        diff >>= 1
+
+    return count
+
+def near_duplicate(simhash):
+    # Returns True if a similar fingerprint has already been seen.
+    for seen_hash in SEEN_SIMHASHES:
+        if count_bit_differences(simhash, seen_hash) <= SIMHASH_DIFF_THRESHOLD:
+            return True
+
+    SEEN_SIMHASHES.add(simhash)
+    return False
+
