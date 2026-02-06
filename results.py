@@ -11,7 +11,7 @@ def longest_page():
 def most_common_words(k=50):
     print(f"{k} most common words: ")
     n = 0
-    for k, v in save.items():
+    for k, v in save['word_frequency'].items():
         if n == k: break
         print(f"{k}: {v}  ", end='')
         n += 1
