@@ -9,7 +9,7 @@ def longest_page():
     print("Longest page: ", save['longest_page'])
 
 def most_common_words(limit=50):
-    print(f"{k} most common words: ")
+    print(f"{limit} most common words: ")
     n = 0
     word_frequencies = save['word_frequency'].items()
     for k, v in word_frequencies:
