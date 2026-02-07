@@ -141,7 +141,8 @@ def is_valid(url):
 
         date_patterns = [
             r"\b\d{4}[-/\.]\d{1,2}[-/\.]\d{1,2}\b",   # 2023-05-22, 2023/05/22, 2023.05.22
-            r"\b\d{8}\b"  # 20230522
+            r"\b\d{8}\b",  # 20230522
+            r"\b\d{4}[-/\.]\d{1,2}\b"  # 2023-05, 2023/05, 2023.05
         ]
         # check if any query parameter values contain any dates (ex: YYYY-MM-DD, YYYY/MM/DD, YYYYMMDD)
         if parsed.query:
