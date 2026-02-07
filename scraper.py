@@ -89,9 +89,9 @@ def extract_next_links(url, resp, min_text_length=200):
         if exact_duplicate(text):
             return [], words
 
-        document_fingerprint = compute_simhash(words)
-        if near_duplicate(document_fingerprint):
-            return [], words
+        # document_fingerprint = compute_simhash(words)
+        # if near_duplicate(document_fingerprint):
+        #     return [], words
 
         a_tags = soup.find_all('a', href=True)
         for anchor in a_tags:
