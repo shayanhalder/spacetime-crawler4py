@@ -4,7 +4,7 @@ from bs4 import BeautifulSoup
 
 SEEN_EXACT_HASHES = set()
 SEEN_SIMHASHES = set()
-SIMHASH_DIFF_THRESHOLD = 3
+SIMHASH_DIFF_THRESHOLD = 6
 
 def scraper(url, resp):
     links, words = extract_next_links(url, resp)
@@ -23,6 +23,11 @@ def extract_next_links(url, resp, min_text_length=200):
     if resp.status != 200 or not resp.raw_response or not resp.raw_response.content:
         return [], []
 
+    # check if file is not html
+    content_type = resp.raw_response.headers.get("Content-Type", "")
+    if "text/html" not in content_type:
+        return [], []
+    
     # check if file size is very large (>2MB); avoid crawling
     if len(resp.raw_response.content) > 2_000_000:
         return [], []
@@ -100,6 +105,11 @@ def is_valid(url):
             query_lower = parsed.query.lower()
             for pat in date_patterns:
                 if re.search(pat, query_lower):
+                    return False
+            # check if "date" or "dates" appears as query keys or values
+            query_params = query_lower.split('&')
+            for param in query_params:
+                if "date" in param or "dates" in param:
                     return False
         
         # don't crawl any event pages
