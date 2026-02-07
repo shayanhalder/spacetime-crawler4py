@@ -157,7 +157,7 @@ def is_valid(url):
             # check if "date" or "dates" appears as query keys or values
             query_params = query_lower.split('&')
             for param in query_params:
-                if "date" in param or "dates" in param:
+                if "date" in param or "dates" in param or "ical" in param:
                     return False
         
         # check if any dates are in the path
