@@ -1,3 +1,4 @@
+from datetime import date
 import re
 from urllib.parse import urlparse, urljoin
 from bs4 import BeautifulSoup
@@ -138,13 +139,16 @@ def is_valid(url):
         if re.search(r"doku\.php", url.lower()):
             return False
 
+        date_patterns = [
+            r"\b\d{4}[-/\.]\d{1,2}[-/\.]\d{1,2}\b",   # 2023-05-22, 2023/05/22, 2023.05.22
+            r"\b\d{8}\b"  # 20230522
+        ]
         # check if any query parameter values contain any dates (ex: YYYY-MM-DD, YYYY/MM/DD, YYYYMMDD)
         if parsed.query:
-            # This matches YYYY-MM-DD, YYYY/MM/DD, YYYY.MM.DD, or just YYYYMMDD
-            date_patterns = [
-                r"\b\d{4}[-/\.]\d{1,2}[-/\.]\d{1,2}\b",   # 2023-05-22, 2023/05/22, 2023.05.22
-                r"\b\d{8}\b"  # 20230522
-            ]
+            # date_patterns = [
+            #     r"\b\d{4}[-/\.]\d{1,2}[-/\.]\d{1,2}\b",   # 2023-05-22, 2023/05/22, 2023.05.22
+            #     r"\b\d{8}\b"  # 20230522
+            # ]
             query_lower = parsed.query.lower()
             for pat in date_patterns:
                 if re.search(pat, query_lower):
@@ -155,6 +159,12 @@ def is_valid(url):
                 if "date" in param or "dates" in param:
                     return False
         
+        # check if any dates are in the path
+        if parsed.path:
+            for pat in date_patterns:
+                if re.search(pat, parsed.path):
+                    return False
+
         # don't crawl any event pages
         # check if '/event' or '/events' is in the path of the url
         # if "/events" in parsed.path or "/event" in parsed.path:
