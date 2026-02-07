@@ -10,6 +10,43 @@ def scraper(url, resp):
     links, words = extract_next_links(url, resp)
     return [link for link in links if is_valid(link)], words
 
+def tokenize(text: str) -> list[str]:
+    tokens = []
+    seen = set()
+    current_token = []
+    
+    i = 0
+    while i < len(text): 
+        char = text[i]
+        if not char:
+            if current_token:
+                final_token = (''.join(current_token)).lower()
+                if final_token in seen: 
+                    current_token = []
+                    i += 1
+                    continue
+                tokens.append(final_token)
+                seen.add(final_token)
+                current_token = []
+            break
+        
+        if (char and not char.isalnum() or not char.isascii()):
+            if current_token:
+                final_token = (''.join(current_token)).lower()
+                if final_token in seen: 
+                    current_token = []
+                    i += 1
+                    continue
+                tokens.append(final_token)
+                seen.add(final_token)
+                current_token = []
+        else:
+            current_token.append(char)
+        
+        i += 1
+    
+    return tokens
+
 def extract_next_links(url, resp, min_text_length=200):
     # Implementation required.
     # url: the URL that was used to get the page
@@ -40,8 +77,10 @@ def extract_next_links(url, resp, min_text_length=200):
         # check if page has little text; avoid crawling
         text = soup.get_text(separator=' ', strip=True)
 
-        words = text.split()
-        words = [w for w in words if re.search(r'[a-zA-Z]', w)] # only count words with letters
+        words = tokenize(text)
+
+        # words = text.split()
+        # words = [w for w in words if re.search(r'[a-zA-Z]', w)] # only count words with letters
 
         if len(text) < min_text_length:
             return [], words
