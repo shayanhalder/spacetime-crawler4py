@@ -133,6 +133,10 @@ def is_valid(url):
         # check for trap keywords
         if re.search(r"(calendar|login|signup|reply|share)", url.lower()):
             return False
+        
+        # hardcoded traps 
+        if re.search(r"doku\.php", url.lower()):
+            return False
 
         # check if any query parameter values contain any dates (ex: YYYY-MM-DD, YYYY/MM/DD, YYYYMMDD)
         if parsed.query:
