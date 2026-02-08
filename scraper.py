@@ -1,10 +1,13 @@
 import re
 from urllib.parse import urlparse, urljoin
 from bs4 import BeautifulSoup
+from threading import Lock
 
 SEEN_EXACT_HASHES = set()
 SEEN_SIMHASHES = set()
-SIMHASH_DIFF_THRESHOLD = 3
+SIMHASH_DIFF_THRESHOLD = 10
+SEEN_EXACT_HASHES_LOCK = Lock()
+SEEN_SIMHASHES_LOCK = Lock()
 
 def scraper(url, resp):
     links, words = extract_next_links(url, resp)
@@ -41,12 +44,9 @@ def extract_next_links(url, resp, min_text_length=200):
         if len(text) < min_text_length:
             return [], words
 
-        if exact_duplicate(text):
-            return [], words
-
-        document_fingerprint = compute_simhash(words)
-        if near_duplicate(document_fingerprint):
-            return [], words
+        # document_fingerprint = compute_simhash(words)
+        # if near_duplicate(document_fingerprint):
+        #     return [], words
 
         a_tags = soup.find_all('a', href=True)
         for anchor in a_tags:
@@ -58,9 +58,12 @@ def extract_next_links(url, resp, min_text_length=200):
 
             if absolute_url:
                 links.add(absolute_url)
-        
+
+        if exact_duplicate(text):
+            return [], words
+
         return list(links), words
-    
+
     except Exception as e:
         print(f"Error extracting links from {url}: {e}")
         
@@ -75,7 +78,7 @@ def is_valid(url):
         if parsed.scheme not in set(["http", "https"]):
             return False
         
-        # check if domain is one of the allowed UCI domains
+        # check if domain is one of the allowed domains
         allowed_domains = [".ics.uci.edu", ".cs.uci.edu", ".informatics.uci.edu", ".stat.uci.edu"]
         netloc_lower = parsed.netloc.lower()
         if not any(netloc_lower.endswith(domain) or netloc_lower == domain[1:] for domain in allowed_domains):
@@ -87,8 +90,13 @@ def is_valid(url):
             return False
 
         # check for trap keywords
-        if re.search(r"(calendar|login|signup|reply|share)", url.lower()):
+        if re.search(r"(login|signup|reply|share)", url.lower()):
             return False
+        
+        if parsed.query:
+            calendar_params = ["ical", "outlook-ical", "tribe-bar-date", "eventDisplay"]
+            if any(param in parsed.query.lower() for param in calendar_params):
+                return False
 
         # check if any query parameter values contain any dates (ex: YYYY-MM-DD, YYYY/MM/DD, YYYYMMDD)
         if parsed.query:
@@ -102,12 +110,24 @@ def is_valid(url):
                 if re.search(pat, query_lower):
                     return False
         
-        # don't crawl any event pages
-        # check if '/event' or '/events' is in the path of the url
-        if "/events" in parsed.path or "/event" in parsed.path:
+        # check for dates in the path
+        date_patterns_in_path = [
+            r"/\d{4}-\d{1,2}-\d{1,2}/",   
+            r"/\d{4}/\d{1,2}/\d{1,2}/",  
+        ]
+        for pat in date_patterns_in_path:
+            if re.search(pat, parsed.path):
+                return False
+        
+        if "/events" in parsed.path.lower() or "/event" in parsed.path.lower():
+            return False
+        
+        # block calendar-specific paths
+        calendar_keywords = ["calendar", "today", "month", "day", "week", "list"]
+        if any(keyword in parsed.path.lower() for keyword in calendar_keywords):
             return False
 
-        # skip pagination (can change to allow based on reqs)
+        # skip pagination
         if re.search(r"(page=\d+|p=\d+)", url.lower()):
             return False
 
@@ -143,10 +163,11 @@ def exact_duplicate(text):
     for ch in normalized:
         h = (h * base + ord(ch)) % mod
 
-    if h in SEEN_EXACT_HASHES:
-        return True
+    with SEEN_EXACT_HASHES_LOCK:
+        if h in SEEN_EXACT_HASHES:
+            return True
 
-    SEEN_EXACT_HASHES.add(h)
+        SEEN_EXACT_HASHES.add(h)
     return False
 
 def hash_word(word):
@@ -201,10 +222,12 @@ def count_bit_differences(hash1, hash2):
 
 def near_duplicate(simhash):
     # Returns True if a similar fingerprint has already been seen.
-    for seen_hash in SEEN_SIMHASHES:
-        if count_bit_differences(simhash, seen_hash) <= SIMHASH_DIFF_THRESHOLD:
-            return True
+    with SEEN_SIMHASHES_LOCK:
+        for seen_hash in SEEN_SIMHASHES:
+            if count_bit_differences(simhash, seen_hash) <= SIMHASH_DIFF_THRESHOLD:
+                return True
 
-    SEEN_SIMHASHES.add(simhash)
+        SEEN_SIMHASHES.add(simhash)
+
     return False
 
