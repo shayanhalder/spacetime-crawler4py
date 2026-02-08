@@ -136,8 +136,10 @@ def is_valid(url):
             return False
         
         # hardcoded traps 
-        if re.search(r"doku\.php", url.lower()):
-            return False
+        traps = ["wiki.ics.uci.edu/doku.php", "grape.ics.uci.edu/wiki", "/events", "/event", "/~eppstein/junkyard", "/~dechter/publications"]
+        for trap in traps: 
+            if trap in url.lower(): 
+                return False
 
         date_patterns = [
             r"\b\d{4}[-/\.]\d{1,2}[-/\.]\d{1,2}\b",   # 2023-05-22, 2023/05/22, 2023.05.22
@@ -165,11 +167,6 @@ def is_valid(url):
             for pat in date_patterns:
                 if re.search(pat, parsed.path):
                     return False
-
-        # don't crawl any event pages
-        # check if '/event' or '/events' is in the path of the url
-        if "/events" in parsed.path or "/event" in parsed.path:
-            return False
 
         # skip pagination (can change to allow based on reqs)
         if re.search(r"(page=\d+|p=\d+)", url.lower()):
