@@ -115,14 +115,18 @@ class Frontier(object):
     
     def log_word_frequency(self, words):
         with self.save_lock:
-            if 'word_frequency' not in self.save:
-                self.save['word_frequency'] = defaultdict(int)
+            freq = self.save.get('word_frequency')
+            if freq is None:
+                freq = defaultdict(int)
+
             for word in words:
-                if not word.lower() in self.stop_words:
-                    freq = self.save.get('word_frequency')
-                    freq[word] = freq.get(word, 0) + 1
-                    self.save['word_frequency'] = freq
+                w = word.lower()
+                if w not in self.stop_words:
+                    freq[w] += 1
+
+            self.save['word_frequency'] = freq
             self.save.sync()
+
         
     def wait_for_politeness(self, url):
         try:

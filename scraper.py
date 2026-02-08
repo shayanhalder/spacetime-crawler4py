@@ -1,10 +1,14 @@
 import re
 from urllib.parse import urlparse, urljoin
 from bs4 import BeautifulSoup
+import threading
+
+EXACT_HASH_LOCK = threading.Lock()
+SIMHASH_LOCK = threading.Lock()
 
 SEEN_EXACT_HASHES = set()
 SEEN_SIMHASHES = set()
-SIMHASH_DIFF_THRESHOLD = 3
+SIMHASH_DIFF_THRESHOLD = 2
 
 def scraper(url, resp):
     links, words = extract_next_links(url, resp)
@@ -143,10 +147,11 @@ def exact_duplicate(text):
     for ch in normalized:
         h = (h * base + ord(ch)) % mod
 
-    if h in SEEN_EXACT_HASHES:
-        return True
+    with EXACT_HASH_LOCK:
+        if h in SEEN_EXACT_HASHES:
+            return True
+        SEEN_EXACT_HASHES.add(h)
 
-    SEEN_EXACT_HASHES.add(h)
     return False
 
 def hash_word(word):
@@ -201,10 +206,11 @@ def count_bit_differences(hash1, hash2):
 
 def near_duplicate(simhash):
     # Returns True if a similar fingerprint has already been seen.
-    for seen_hash in SEEN_SIMHASHES:
-        if count_bit_differences(simhash, seen_hash) <= SIMHASH_DIFF_THRESHOLD:
-            return True
+    with SIMHASH_LOCK:
+        for seen_hash in SEEN_SIMHASHES:
+            if count_bit_differences(simhash, seen_hash) <= SIMHASH_DIFF_THRESHOLD:
+                return True
 
-    SEEN_SIMHASHES.add(simhash)
+        SEEN_SIMHASHES.add(simhash)
     return False
 
