@@ -168,8 +168,8 @@ def is_valid(url):
 
         # don't crawl any event pages
         # check if '/event' or '/events' is in the path of the url
-        # if "/events" in parsed.path or "/event" in parsed.path:
-        #     return False
+        if "/events" in parsed.path or "/event" in parsed.path:
+            return False
 
         # skip pagination (can change to allow based on reqs)
         if re.search(r"(page=\d+|p=\d+)", url.lower()):
