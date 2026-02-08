@@ -1,3 +1,4 @@
+from datetime import date
 import re
 from urllib.parse import urlparse, urljoin
 from bs4 import BeautifulSoup
@@ -13,7 +14,44 @@ def scraper(url, resp):
     links, words = extract_next_links(url, resp)
     return [link for link in links if is_valid(link)], words
 
-def extract_next_links(url, resp, min_text_length=200):
+def tokenize(text: str) -> list[str]:
+    tokens = []
+    seen = set()
+    current_token = []
+    
+    i = 0
+    while i < len(text): 
+        char = text[i]
+        if not char:
+            if current_token:
+                final_token = (''.join(current_token)).lower()
+                if final_token in seen: 
+                    current_token = []
+                    i += 1
+                    continue
+                tokens.append(final_token)
+                seen.add(final_token)
+                current_token = []
+            break
+        
+        if (char and not char.isalnum() or not char.isascii()):
+            if current_token:
+                final_token = (''.join(current_token)).lower()
+                if final_token in seen: 
+                    current_token = []
+                    i += 1
+                    continue
+                tokens.append(final_token)
+                seen.add(final_token)
+                current_token = []
+        else:
+            current_token.append(char)
+        
+        i += 1
+    
+    return tokens
+
+def extract_next_links(url, resp, min_text_length=500):
     # Implementation required.
     # url: the URL that was used to get the page
     # resp.url: the actual url of the page
@@ -26,6 +64,11 @@ def extract_next_links(url, resp, min_text_length=200):
     if resp.status != 200 or not resp.raw_response or not resp.raw_response.content:
         return [], []
 
+    # check if file is not html
+    content_type = resp.raw_response.headers.get("Content-Type", "")
+    if "text/html" not in content_type:
+        return [], []
+    
     # check if file size is very large (>2MB); avoid crawling
     if len(resp.raw_response.content) > 2_000_000:
         return [], []
@@ -37,16 +80,17 @@ def extract_next_links(url, resp, min_text_length=200):
 
         # check if page has little text; avoid crawling
         text = soup.get_text(separator=' ', strip=True)
-
-        words = text.split()
-        words = [w for w in words if re.search(r'[a-zA-Z]', w)] # only count words with letters
+        words = tokenize(text)
 
         if len(text) < min_text_length:
             return [], words
 
-        # document_fingerprint = compute_simhash(words)
-        # if near_duplicate(document_fingerprint):
-        #     return [], words
+        if exact_duplicate(text):
+            return [], words
+
+        document_fingerprint = compute_simhash(words)
+        if near_duplicate(document_fingerprint):
+            return [], words
 
         a_tags = soup.find_all('a', href=True)
         for anchor in a_tags:
@@ -58,9 +102,6 @@ def extract_next_links(url, resp, min_text_length=200):
 
             if absolute_url:
                 links.add(absolute_url)
-
-        if exact_duplicate(text):
-            return [], words
 
         return list(links), words
 
@@ -84,8 +125,7 @@ def is_valid(url):
         if not any(netloc_lower.endswith(domain) or netloc_lower == domain[1:] for domain in allowed_domains):
             return False
         
-        ### Check and avoid infinite traps ###
-        # url too long
+        # url too long, probably deep in a file dump
         if len(url) > 300:
             return False
 
@@ -93,50 +133,50 @@ def is_valid(url):
         if re.search(r"(login|signup|reply|share)", url.lower()):
             return False
         
-        if parsed.query:
-            calendar_params = ["ical", "outlook-ical", "tribe-bar-date", "eventDisplay"]
-            if any(param in parsed.query.lower() for param in calendar_params):
+        # check for excessive query params
+        if parsed.query and len(parsed.query) > 100:
+            return False
+        
+        # hardcoded traps little information value and excessive linking
+        traps = ["wiki.ics.uci.edu/doku.php", "grape.ics.uci.edu/wiki", "/events", "/event", "/~eppstein/junkyard", "/~dechter/publications"]
+        for trap in traps: 
+            if trap in url.lower(): 
                 return False
+        
+        # calendar/event query param traps
+        date_patterns = [
+            r"\b\d{4}[-/\.]\d{1,2}[-/\.]\d{1,2}\b",   # 2023-05-22, 2023/05/22, 2023.05.22
+            r"\b\d{8}\b",  # 20230522
+            r"\b\d{4}[-/\.]\d{1,2}\b"  # 2023-05, 2023/05, 2023.05
+        ]
 
-        # check if any query parameter values contain any dates (ex: YYYY-MM-DD, YYYY/MM/DD, YYYYMMDD)
         if parsed.query:
-            # This matches YYYY-MM-DD, YYYY/MM/DD, YYYY.MM.DD, or just YYYYMMDD
-            date_patterns = [
-                r"\b\d{4}[-/\.]\d{1,2}[-/\.]\d{1,2}\b",   # 2023-05-22, 2023/05/22, 2023.05.22
-                r"\b\d{8}\b"  # 20230522
-            ]
             query_lower = parsed.query.lower()
+            calendar_params = ["ical", "outlook-ical", "tribe-bar-date", "eventDisplay", "date", "dates"] # calendar traps
+            if any(param in query_lower for param in calendar_params):
+                return False
+            
+            # exclude query params with dates (ex: YYYY-MM-DD, YYYY/MM/DD, YYYYMMDD)
             for pat in date_patterns:
                 if re.search(pat, query_lower):
                     return False
         
-        # check for dates in the path
-        date_patterns_in_path = [
-            r"/\d{4}-\d{1,2}-\d{1,2}/",   
-            r"/\d{4}/\d{1,2}/\d{1,2}/",  
-        ]
-        for pat in date_patterns_in_path:
+        # exclude paths with dates as well, typically lead to very large event calendars
+        for pat in date_patterns:
             if re.search(pat, parsed.path):
                 return False
-        
-        if "/events" in parsed.path.lower() or "/event" in parsed.path.lower():
-            return False
-        
+
         # block calendar-specific paths
         calendar_keywords = ["calendar", "today", "month", "day", "week", "list"]
         if any(keyword in parsed.path.lower() for keyword in calendar_keywords):
             return False
-
+        
         # skip pagination
         if re.search(r"(page=\d+|p=\d+)", url.lower()):
             return False
 
-        # check for excessive query params
-        if parsed.query and len(parsed.query) > 100:
-            return False
-
         # disallow any file types other than html
-        return not re.match(
+        return (not re.match(
             r".*\.(css|js|bmp|gif|jpe?g|ico"
             + r"|png|tiff?|mid|mp2|mp3|mp4"
             + r"|wav|avi|mov|mpeg|ram|m4v|mkv|ogg|ogv|pdf"
@@ -144,7 +184,17 @@ def is_valid(url):
             + r"|data|dat|exe|bz2|tar|msi|bin|7z|psd|dmg|iso"
             + r"|epub|dll|cnf|tgz|sha1"
             + r"|thmx|mso|arff|rtf|jar|csv|json"
-            + r"|rm|smil|wmv|swf|wma|zip|rar|gz)$", parsed.path.lower())
+            + r"|rm|smil|wmv|swf|wma|zip|rar|gz)$", parsed.path.lower()) and not
+            re.match(
+                r".*\.(css|js|bmp|gif|jpe?g|ico"
+                + r"|png|tiff?|mid|mp2|mp3|mp4"
+                + r"|wav|avi|mov|mpeg|ram|m4v|mkv|ogg|ogv|pdf"
+                + r"|ps|eps|tex|ppt|pptx|doc|docx|xls|xlsx|names"
+                + r"|data|dat|exe|bz2|tar|msi|bin|7z|psd|dmg|iso"
+                + r"|epub|dll|cnf|tgz|sha1"
+                + r"|thmx|mso|arff|rtf|jar|csv|json"
+                + r"|rm|smil|wmv|swf|wma|zip|rar|gz)$", parsed.query.lower())
+            )
 
     except TypeError:
         print ("TypeError for ", parsed)

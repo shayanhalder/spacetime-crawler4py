@@ -53,9 +53,12 @@ class Frontier(object):
             save_values = self.save.values()
 
         urls_to_add = []
-        for url, completed in save_values:
-            if not completed and is_valid(url):
-                urls_to_add.append(url)
+        # for url, completed in save_values:
+        for value in save_values:
+            if type(value) == tuple:
+                url, completed = value
+                if not completed and is_valid(url):
+                    urls_to_add.append(url)
 
         self.logger.info(
             f"Found {len(urls_to_add)} urls to be downloaded from {total_count} "
