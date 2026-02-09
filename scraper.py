@@ -6,7 +6,7 @@ from threading import Lock
 
 SEEN_EXACT_HASHES = set()
 SEEN_SIMHASHES = set()
-SIMHASH_DIFF_THRESHOLD = 10
+SIMHASH_DIFF_THRESHOLD = 3
 SEEN_EXACT_HASHES_LOCK = Lock()
 SEEN_SIMHASHES_LOCK = Lock()
 
@@ -138,7 +138,7 @@ def is_valid(url):
             return False
         
         # hardcoded traps little information value and excessive linking
-        traps = ["wiki.ics.uci.edu/doku.php", "grape.ics.uci.edu/wiki", "/events", "/event", "/~eppstein/junkyard", "/~dechter/publications"]
+        traps = ["wiki.ics.uci.edu/doku.php", "grape.ics.uci.edu/wiki", "/events", "/event", "/~eppstein/junkyard", "/~eppstein/pix" "/~dechter/publications"]
         for trap in traps: 
             if trap in url.lower(): 
                 return False
