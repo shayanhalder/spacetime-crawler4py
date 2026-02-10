@@ -19,8 +19,10 @@ def most_common_words(limit=50):
     print()
 
 def subdomains():
-    print(f"{len(save['subdomain_frequencies'].keys())} subdomains found: ")
-    print(save['subdomain_frequencies'])
+    subdomain_freqs = save['subdomain_frequencies']
+    print(f"{len(subdomain_freqs.keys())} subdomains found:")
+    for subdomain, freq in sorted(subdomain_freqs.items(), key=lambda item: item[0]):
+        print(f"{subdomain}, {freq}")
 
 if __name__ == "__main__":
     num_unique_pages()

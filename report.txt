@@ -1,0 +1,5 @@
+1. 13525 unique pages were found
+2. Longest page was https://www.stat.uci.edu/covid19/index.html
+3. 50 most common words:
+    department, statistics, donald, bren, school, information, computer, sciences, explore, chair, s, welcome, contact, tutoring, resources, faculty, directory, job, opportunities, research, graduate, degrees, m, ph, d, master, data, science, current, course, listings, student, internships, employment, employers, uci, students, undergraduate, b, minor, news, seminars, seminar, center, statistical, consulting, launches, new, professional, program 
+4. 
