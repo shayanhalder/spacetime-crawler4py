@@ -6,7 +6,7 @@ from threading import Lock
 
 SEEN_EXACT_HASHES = set()
 SEEN_SIMHASHES = set()
-SIMHASH_DIFF_THRESHOLD = 3
+SIMHASH_DIFF_THRESHOLD = 2
 SEEN_EXACT_HASHES_LOCK = Lock()
 SEEN_SIMHASHES_LOCK = Lock()
 
@@ -31,7 +31,7 @@ def tokenize(text: str) -> list[str]:
 
     return tokens
 
-def extract_next_links(url, resp, min_text_length=500):
+def extract_next_links(url, resp, min_text_length=300):
     # Implementation required.
     # url: the URL that was used to get the page
     # resp.url: the actual url of the page
