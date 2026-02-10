@@ -89,7 +89,7 @@ def extract_next_links(url, resp, min_text_length=300):
     except Exception as e:
         print(f"Error extracting links from {url}: {e}")
         
-    return [], words
+    return [], []
 
 def is_valid(url):
     # Decide whether to crawl this url or not. 
