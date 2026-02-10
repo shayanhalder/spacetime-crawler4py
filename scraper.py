@@ -16,39 +16,19 @@ def scraper(url, resp):
 
 def tokenize(text: str) -> list[str]:
     tokens = []
-    seen = set()
     current_token = []
-    
-    i = 0
-    while i < len(text): 
-        char = text[i]
-        if not char:
-            if current_token:
-                final_token = (''.join(current_token)).lower()
-                if final_token in seen: 
-                    current_token = []
-                    i += 1
-                    continue
-                tokens.append(final_token)
-                seen.add(final_token)
-                current_token = []
-            break
-        
-        if (char and not char.isalnum() or not char.isascii()):
-            if current_token:
-                final_token = (''.join(current_token)).lower()
-                if final_token in seen: 
-                    current_token = []
-                    i += 1
-                    continue
-                tokens.append(final_token)
-                seen.add(final_token)
-                current_token = []
+
+    for char in text:
+        if char.isalnum() and char.isascii():
+            current_token.append(char.lower())
         else:
-            current_token.append(char)
-        
-        i += 1
-    
+            if current_token:
+                tokens.append(''.join(current_token))
+                current_token = []
+
+    if current_token:
+        tokens.append(''.join(current_token))
+
     return tokens
 
 def extract_next_links(url, resp, min_text_length=500):
@@ -78,20 +58,6 @@ def extract_next_links(url, resp, min_text_length=500):
     try:
         soup = BeautifulSoup(resp.raw_response.content, 'html.parser')
 
-        # check if page has little text; avoid crawling
-        text = soup.get_text(separator=' ', strip=True)
-        words = tokenize(text)
-
-        if len(text) < min_text_length:
-            return [], words
-
-        if exact_duplicate(text):
-            return [], words
-
-        document_fingerprint = compute_simhash(words)
-        if near_duplicate(document_fingerprint):
-            return [], words
-
         a_tags = soup.find_all('a', href=True)
         for anchor in a_tags:
             href = anchor['href']
@@ -102,6 +68,21 @@ def extract_next_links(url, resp, min_text_length=500):
 
             if absolute_url:
                 links.add(absolute_url)
+
+        # check if page has little text; avoid crawling
+        text = soup.get_text(separator=' ', strip=True)
+        words = tokenize(text)
+
+        if len(text) < min_text_length:
+            return list(links), words
+
+        if exact_duplicate(text):
+            return [], words
+
+        document_fingerprint = compute_simhash(words)
+        if near_duplicate(document_fingerprint):
+            return list(links), words
+
 
         return list(links), words
 
