@@ -1,7 +1,7 @@
 import os
 import shelve
 import time
-from threading import Thread, RLock
+from threading import Thread, RLock, Condition
 from queue import Queue, Empty
 from urllib.parse import urlparse
 from utils import get_logger, get_urlhash, normalize
@@ -13,11 +13,13 @@ class Frontier(object):
         self.logger = get_logger("FRONTIER")
         self.config = config
         self.to_be_downloaded = list()
+        self.in_progress = 0
         
         # Thread-safe structures
         self.domain_last_access = {}
         self.domain_lock = RLock()
         self.frontier_lock = RLock()  # Lock for frontier operations
+        self.frontier_cv = Condition(self.frontier_lock)
         self.save_lock = RLock()  # Lock for shelve operations
         
         if not os.path.exists(self.config.save_file) and not restart:
@@ -36,8 +38,8 @@ class Frontier(object):
             for url in self.config.seed_urls:
                 self.add_url(url)
             self.save['longest_page'] = (None, 0)
-            self.save['subdomain_frequencies'] = defaultdict[str, int](int)
-            self.save['word_frequency'] = defaultdict[str, int](int)
+            self.save['subdomain_frequencies'] = defaultdict(int)
+            self.save['word_frequency'] = defaultdict(int)
         else:
             # Set the frontier state with contents of save file.
             self._parse_save_file()
@@ -66,13 +68,19 @@ class Frontier(object):
         
         with self.frontier_lock:
             self.to_be_downloaded.extend(urls_to_add)
+            self.frontier_cv.notify_all()
 
     def get_tbd_url(self):
-        with self.frontier_lock:
-            try:
-                return self.to_be_downloaded.pop()
-            except IndexError:
-                return None
+        with self.frontier_cv:
+
+            while not self.to_be_downloaded:
+                if self.in_progress == 0:
+                    return None
+                self.frontier_cv.wait(timeout=1.0)
+
+            url = self.to_be_downloaded.pop()
+            self.in_progress += 1
+            return url
 
     def add_url(self, url):
         url = normalize(url)
@@ -85,8 +93,9 @@ class Frontier(object):
                 add_to_frontier = True
 
         if add_to_frontier:
-            with self.frontier_lock:
+            with self.frontier_cv:
                 self.to_be_downloaded.append(url)
+                self.frontier_cv.notify()
     
     def mark_url_complete(self, url, word_count):
         urlhash = get_urlhash(url)
@@ -95,16 +104,20 @@ class Frontier(object):
                 # This should not happen.
                 self.logger.error(
                     f"Completed url {url}, but have not seen it before.")
-                return
+            else:
+                if 'longest_page' not in self.save:
+                    self.save['longest_page'] = (None, 0)
             
-            if 'longest_page' not in self.save:
-                self.save['longest_page'] = (None, 0)
-            
-            if word_count > self.save['longest_page'][1]:
-                self.save['longest_page'] = (url, word_count)
+                if word_count > self.save['longest_page'][1]:
+                    self.save['longest_page'] = (url, word_count)
 
-            self.save[urlhash] = (url, True)
-            self.save.sync()
+                self.save[urlhash] = (url, True)
+                self.save.sync()
+
+        with self.frontier_cv:
+            if self.in_progress > 0:
+                self.in_progress -= 1
+            self.frontier_cv.notify_all()
     
     def log_domain_count(self, url):
         domain = urlparse(url).netloc.lower()

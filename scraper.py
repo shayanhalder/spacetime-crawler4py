@@ -82,16 +82,6 @@ def extract_next_links(url, resp, min_text_length=500):
         text = soup.get_text(separator=' ', strip=True)
         words = tokenize(text)
 
-        if len(text) < min_text_length:
-            return [], words
-
-        if exact_duplicate(text):
-            return [], words
-
-        document_fingerprint = compute_simhash(words)
-        if near_duplicate(document_fingerprint):
-            return [], words
-
         a_tags = soup.find_all('a', href=True)
         for anchor in a_tags:
             href = anchor['href']
@@ -102,6 +92,18 @@ def extract_next_links(url, resp, min_text_length=500):
 
             if absolute_url:
                 links.add(absolute_url)
+
+        # If page is too short / duplicate / near-duplicate, we still return links
+        # but can optionally drop words so it doesn't skew analytics.
+        if len(text) < min_text_length:
+            return list(links), words
+
+        if exact_duplicate(text):
+            return list(links), []
+
+        document_fingerprint = compute_simhash(words)
+        if near_duplicate(document_fingerprint):
+            return list(links), []
 
         return list(links), words
 
