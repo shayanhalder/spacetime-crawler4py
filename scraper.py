@@ -119,7 +119,15 @@ def is_valid(url):
             return False
         
         # hardcoded traps little information value and excessive linking
-        traps = ["wiki.ics.uci.edu/doku.php", "grape.ics.uci.edu/wiki", "/events", "/event", "/~eppstein/junkyard", "/~eppstein/pix" "/~dechter/publications"]
+        traps = [
+            "wiki.ics.uci.edu/doku.php",
+            "grape.ics.uci.edu/wiki",
+            "/events",
+            "/event",
+            "/~eppstein/junkyard",
+            "/~eppstein/pix",
+            "/~dechter/publications",
+        ]
         for trap in traps: 
             if trap in url.lower(): 
                 return False
@@ -142,15 +150,13 @@ def is_valid(url):
                 if re.search(pat, query_lower):
                     return False
         
-        # exclude paths with dates as well, typically lead to very large event calendars
-        for pat in date_patterns:
-            if re.search(pat, parsed.path):
-                return False
-
         # block calendar-specific paths
-        calendar_keywords = ["calendar", "today", "month", "day", "week", "list"]
+        calendar_keywords = ["calendar", "today", "month", "day", "week"]
         if any(keyword in parsed.path.lower() for keyword in calendar_keywords):
-            return False
+            # If it's a calendar path, check for dates to avoid infinite loops
+            for pat in date_patterns:
+                if re.search(pat, parsed.path):
+                    return False
         
         # skip pagination
         if re.search(r"(page=\d+|p=\d+)", url.lower()):

@@ -36,8 +36,8 @@ class Frontier(object):
             for url in self.config.seed_urls:
                 self.add_url(url)
             self.save['longest_page'] = (None, 0)
-            self.save['subdomain_frequencies'] = defaultdict[str, int](int)
-            self.save['word_frequency'] = defaultdict[str, int](int)
+            self.save['subdomain_frequencies'] = defaultdict(int)
+            self.save['word_frequency'] = defaultdict(int)
         else:
             # Set the frontier state with contents of save file.
             self._parse_save_file()
@@ -50,7 +50,7 @@ class Frontier(object):
         ''' This function can be overridden for alternate saving techniques. '''
         with self.save_lock:
             total_count = len(self.save)
-            save_values = self.save.values()
+            save_values = list(self.save.values())
 
         urls_to_add = []
         # for url, completed in save_values:
@@ -120,11 +120,11 @@ class Frontier(object):
         with self.save_lock:
             if 'word_frequency' not in self.save:
                 self.save['word_frequency'] = defaultdict(int)
+            freq = self.save.get('word_frequency', defaultdict(int))
             for word in words:
-                if not word.lower() in self.stop_words:
-                    freq = self.save.get('word_frequency')
+                if word.lower() not in self.stop_words:
                     freq[word] = freq.get(word, 0) + 1
-                    self.save['word_frequency'] = freq
+            self.save['word_frequency'] = freq
             self.save.sync()
         
     def wait_for_politeness(self, url):
