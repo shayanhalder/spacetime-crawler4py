@@ -84,6 +84,18 @@ def extract_next_links(url, resp, min_text_length=300):
             return list(links), words
 
 
+        # If page is too short / duplicate / near-duplicate, we still return links
+        # but can optionally drop words so it doesn't skew analytics.
+        if len(text) < min_text_length:
+            return list(links), words
+
+        if exact_duplicate(text):
+            return list(links), []
+
+        document_fingerprint = compute_simhash(words)
+        if near_duplicate(document_fingerprint):
+            return list(links), []
+
         return list(links), words
 
     except Exception as e:
